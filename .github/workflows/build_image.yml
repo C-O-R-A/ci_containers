@@ -21,7 +21,14 @@ jobs:
       - id: find
         shell: bash
         run: |
-          mapfile -t devcontainer_dirs < <(find . -type f -name "devcontainer.json" -printf '%h\n' | sort)
+          mapfile -t devcontainer_dirs < <(
+            find . \
+              -type f \
+              -name "devcontainer.json" \
+              ! -path "./.devcontainer/*" \
+              ! -path "*/.devcontainer/*" \
+              -printf '%h\n' | sort
+          )
 
           if [ "${#devcontainer_dirs[@]}" -eq 0 ]; then
             echo "matrix=[]" >> "$GITHUB_OUTPUT"
@@ -63,6 +70,11 @@ jobs:
           devcontainer_dir="${{ matrix.devcontainer_dir }}"
           workspace_folder="$(dirname "$devcontainer_dir")"
           image_name="$(basename "$devcontainer_dir")"
+
+          if [[ "$image_name" == .* ]]; then
+            image_name="${image_name#.}"
+          fi
+
           if [ -z "$image_name" ] || [ "$image_name" = "." ]; then
             image_name="default"
           fi
