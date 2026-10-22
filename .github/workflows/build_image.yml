@@ -1,18 +1,46 @@
-name: Docker Image CI
+name: Build all container images
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.find.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: find
+        shell: bash
+        run: |
+          # Find all Dockerfiles anywhere under the repo
+          mapfile -t dockerfiles < <(find . -type f \( -name "Dockerfile" -o -name "*.Dockerfile" \) | sort)
+
+          # Convert to a JSON array for GitHub Actions matrix
+          json=$(printf '%s\n' "${dockerfiles[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')
+          echo "matrix=${json}" >> "$GITHUB_OUTPUT"
 
   build:
-
+    needs: discover
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile: ${{ fromJSON(needs.discover.outputs.matrix) }}
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      - uses: actions/checkout@v4
+
+      - name: Build image for ${{ matrix.dockerfile }}
+        shell: bash
+        run: |
+          context_dir="$(dirname "${{ matrix.dockerfile }}")"
+          image_name="$(basename "$context_dir")"
+          image_tag="${image_name}:${GITHUB_SHA}"
+
+          echo "Building ${{ matrix.dockerfile }} with context $context_dir"
+          docker build -f "${{ matrix.dockerfile }}" -t "$image_tag" "$context_dir"
