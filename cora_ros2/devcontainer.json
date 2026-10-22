@@ -1,0 +1,22 @@
+{
+  "name": "ROS2 Jazzy",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/ros/devcontainers/features/ros:1": {
+      "rosdistro": "jazzy"
+    }
+  },
+  "containerEnv": {
+    "ROS_DISTRO": "jazzy"
+  },
+  "postCreateCommand": "bash cora_ros2/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-vscode.cpptools",
+        "ms-iot.vscode-ros"
+      ]
+    }
+  }
+}
