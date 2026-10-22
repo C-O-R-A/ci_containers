@@ -2,9 +2,11 @@
   "name": "ROS2 Jazzy",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
+    "ghcr.io/ros/devcontainers/features/desktop-lite:1": {},
     "ghcr.io/ros/devcontainers/features/ros:1": {
       "rosdistro": "jazzy"
     }
+
   },
   "containerEnv": {
     "ROS_DISTRO": "jazzy"
