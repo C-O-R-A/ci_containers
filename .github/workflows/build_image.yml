@@ -1,10 +1,14 @@
-name: Build all container images
+name: Build devcontainer images
 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   discover:
@@ -17,30 +21,67 @@ jobs:
       - id: find
         shell: bash
         run: |
-          # Find all Dockerfiles anywhere under the repo
-          mapfile -t dockerfiles < <(find . -type f \( -name "Dockerfile" -o -name "*.Dockerfile" \) | sort)
+          mapfile -t devcontainer_dirs < <(find . -type f -name "devcontainer.json" -printf '%h\n' | sort)
 
-          # Convert to a JSON array for GitHub Actions matrix
-          json=$(printf '%s\n' "${dockerfiles[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')
+          if [ "${#devcontainer_dirs[@]}" -eq 0 ]; then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          json=$(printf '%s\n' "${devcontainer_dirs[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')
           echo "matrix=${json}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: discover
+    if: ${{ needs.discover.outputs.matrix != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dockerfile: ${{ fromJSON(needs.discover.outputs.matrix) }}
+        devcontainer_dir: ${{ fromJSON(needs.discover.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build image for ${{ matrix.dockerfile }}
+      - name: Install devcontainer CLI
+        run: |
+          npm install -g @devcontainers/cli
+
+      - name: Log in to GHCR
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build devcontainer image
         shell: bash
         run: |
-          context_dir="$(dirname "${{ matrix.dockerfile }}")"
-          image_name="$(basename "$context_dir")"
-          image_tag="${image_name}:${GITHUB_SHA}"
+          set -euo pipefail
 
-          echo "Building ${{ matrix.dockerfile }} with context $context_dir"
-          docker build -f "${{ matrix.dockerfile }}" -t "$image_tag" "$context_dir"
+          devcontainer_dir="${{ matrix.devcontainer_dir }}"
+          image_name="$(basename "$devcontainer_dir")"
+          if [ -z "$image_name" ] || [ "$image_name" = "." ]; then
+            image_name="default"
+          fi
+
+          repo_owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image_repo="ghcr.io/${repo_owner}/ci_containers/${image_name}"
+
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            image_tag="latest"
+          else
+            image_tag="${GITHUB_SHA}"
+          fi
+
+          echo "Building devcontainer from ${devcontainer_dir}"
+          devcontainer build \
+            --workspace-folder "$devcontainer_dir" \
+            --image-name "${image_repo}:${image_tag}"
+
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            docker push "${image_repo}:${image_tag}"
+            docker tag "${image_repo}:${image_tag}" "${image_repo}:${GITHUB_SHA}"
+            docker push "${image_repo}:${GITHUB_SHA}"
+          fi
