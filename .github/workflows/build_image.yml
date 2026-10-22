@@ -61,6 +61,7 @@ jobs:
           set -euo pipefail
 
           devcontainer_dir="${{ matrix.devcontainer_dir }}"
+          workspace_folder="$(dirname "$devcontainer_dir")"
           image_name="$(basename "$devcontainer_dir")"
           if [ -z "$image_name" ] || [ "$image_name" = "." ]; then
             image_name="default"
@@ -75,9 +76,9 @@ jobs:
             image_tag="${GITHUB_SHA}"
           fi
 
-          echo "Building devcontainer from ${devcontainer_dir}"
+          echo "Building devcontainer from ${workspace_folder}"
           devcontainer build \
-            --workspace-folder "$devcontainer_dir" \
+            --workspace-folder "$workspace_folder" \
             --image-name "${image_repo}:${image_tag}"
 
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
