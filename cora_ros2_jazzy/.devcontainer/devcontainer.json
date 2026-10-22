@@ -2,7 +2,7 @@
   "name": "ROS2 Jazzy",
   "image": "osrf/ros:jazzy-desktop-full",
   "features": {
-    "ghcr.io/ros/devcontainers/features/desktop-lite:1": {}
+    "ghcr.io/devcontainers/features/desktop-lite:1": {}
   },
   "containerEnv": {
     "ROS_DISTRO": "jazzy"
